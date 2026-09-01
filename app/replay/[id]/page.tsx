@@ -5,7 +5,10 @@ import ReplayPlayer from "@/components/ReplayPlayer";
 import { getRun } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Session replay" };
+export const metadata: Metadata = {
+  title: "Session replay",
+  robots: { index: false, follow: false },
+};
 
 export default async function ReplayPage(props: PageProps<"/replay/[id]">) {
   const { id } = await props.params;

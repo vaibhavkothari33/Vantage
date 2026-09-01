@@ -1,9 +1,17 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import AppChrome from "@/components/AppChrome";
 import RunView, { type RunSnapshot } from "@/components/RunView";
 import { getRun } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
+
+// A run holds someone else's research and expires in an hour — keep it out of
+// search results and out of link previews.
+export const metadata: Metadata = {
+  title: "Teardown",
+  robots: { index: false, follow: false },
+};
 
 export default async function ReportPage(props: PageProps<"/report/[id]">) {
   const { id } = await props.params;
