@@ -1,12 +1,54 @@
-# Competitive Intelligence Agent
+<div align="center">
+
+# Vantage
+
+### Know your competition. Before they know themselves.
 
 Drop in a competitor's URL. An agent browses their site and the public web, then a
 model of your choosing writes a structured teardown — positioning, pricing, tech
-stack, complaints, recent moves, and the gaps you could exploit — while you watch
-it work in real time.
+stack, complaints, momentum, and the gaps you could exploit — while you watch it
+work in real time.
 
-Built with Next.js 16, [Solari](https://getsolari.com) for the managed browser, and
-your choice of Claude, OpenAI, or Gemini for synthesis.
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![Solari](https://img.shields.io/badge/Solari-managed%20browser-E8A33D)](https://getsolari.com)
+
+[![Claude](https://img.shields.io/badge/Claude-supported-D97757?logo=anthropic&logoColor=white)](https://console.anthropic.com)
+[![OpenAI](https://img.shields.io/badge/OpenAI-supported-412991?logo=openai&logoColor=white)](https://platform.openai.com)
+[![Gemini](https://img.shields.io/badge/Gemini-supported-4285F4?logo=googlegemini&logoColor=white)](https://aistudio.google.com)
+![Bring your own key](https://img.shields.io/badge/keys-bring%20your%20own-4ADE80)
+![Run time](https://img.shields.io/badge/full%20run-~30s-4ADE80)
+
+<img src="docs/demo.gif" alt="The agent streaming its progress live while it browses a competitor" width="820" />
+
+**[▶ Watch the full 95-second walkthrough](public/demo.mp4)**
+
+</div>
+
+---
+
+## What it actually does
+
+Most competitor research tools summarise the company's own marketing copy back at
+you. This one browses, corroborates against sources the company does not control,
+and tells you what it could not establish.
+
+<img src="docs/report-preview.png" alt="A rendered teardown showing dated recent moves with sources" width="100%" />
+
+A single run produces:
+
+| Section | Grounded in |
+|---|---|
+| **Positioning** | Homepage and about page |
+| **Pricing** | The pricing page, tier by tier |
+| **Tech stack** | Script/link/meta fingerprints — detected, not guessed |
+| **Complaints** | Search results, ProductHunt, Hacker News |
+| **Recent moves** | Dated Hacker News stories and GitHub push activity |
+| **Opportunities** | Wedges tied to something observed in the data |
+
+Plus a confidence level, an explicit *"not established by this run"* list, a
+Markdown export, and a replayable recording of the browsing session.
 
 ---
 
@@ -18,47 +60,21 @@ cp .env.example .env.local     # add your Solari key
 npm run dev
 ```
 
-Then open http://localhost:3000, add a model API key under **Settings**, and run a
+Open <http://localhost:3000>, add a model API key under **Settings**, and run a
 teardown from the hero field.
 
-The hero also has four one-click examples — `vercel.com`, `cal.com`,
-`posthog.com`, `supabase.com`. Each was verified end to end: homepage, pricing, and about all
-load, the searches return on-topic results, and both Hacker News and GitHub
-resolve, so a demo run always has real material. (`linear.app` is deliberately
-not among them: its homepage times out and its Hacker News matches are "Linear
-Algebra" noise.)
+> **No key handy?** The four examples on the home page — `vercel.com`, `cal.com`,
+> `posthog.com`, `supabase.com` — replay saved runs in ~14 seconds, free.
 
-### Demo mode
+### Environment
 
-Clicking an example **replays a saved run** rather than browsing live: no API
-key, no quota, ~14 seconds, identical every time. Useful for recording a
-walkthrough.
-
-Fixtures are never hand-written. One is created only when a genuine run
-completes successfully — `captureFixture` writes the real events and the real
-teardown to `demo-fixtures/<host>.json`. So a replay is a *cache of real
-output*, not a mock-up, and the report page marks it with a **cached run**
-badge. A host with no fixture yet returns a 404 telling you to run it live once;
-that first successful run seeds it permanently.
-
-Each fixture is a pair of files:
+One server-side secret, and only one:
 
 ```
-demo-fixtures/vercel.com.json               events + teardown
-demo-fixtures/vercel.com.replay.ndjson.gz   the rrweb session recording
+SOLARI_API_KEY=slr_live_...
 ```
 
-The recording is downloaded and stored at capture time, so a demo's **watch
-agent replay** button keeps working forever — Solari's own copy sits behind a
-900-second presigned URL and is retained about a day.
-
-To fill the remaining hosts, run each once with a working key. If a run finished
-before capture existed, back it up while it is still in memory:
-
-```bash
-curl -X POST localhost:3000/api/demo/capture   -H 'content-type: application/json' -d '{"runId":"<run-id>"}'
-# -> {"host":"vercel.com","fixture":true,"recording":true}
-```
+Model keys are **never** configured here. Each user brings their own.
 
 ### Fonts
 
@@ -67,75 +83,62 @@ Display**. Drop `ReferenceSans.woff2` and `ReferenceDisplay.woff2` into
 `public/fonts/` to get them; without those files the stack falls through to Geist
 and the layout is unaffected.
 
-### Environment
-
-Only one server-side secret:
-
-```
-SOLARI_API_KEY=slr_live_...
-```
-
-**Model keys are not configured here.** Each user brings their own — pick Claude,
-OpenAI, or Gemini in the UI and paste a key. See [Bring your own key](#bring-your-own-key).
-
 ---
 
 ## How a run works
 
-1. `POST /api/run` validates the URL and the provider credentials, creates a run
-   ID, and starts the agent in the background (returns `202` immediately).
-2. The client opens an `EventSource` on `/api/status/[id]` and renders each step
-   as it happens.
-3. The agent collects, in roughly 20 seconds:
-   - **Homepage** — a single navigation yields readable text, front-end asset
-     fingerprints, and the link graph.
-   - **/pricing and /about** — located from the homepage links, fetched in parallel.
-   - **Web search** — "{company} reviews", "funding", and "news".
-   - **ProductHunt** — via a host-filtered search.
-   - **Hacker News** — the public Algolia index: dated, scored, never bot-blocked.
-   - **GitHub** — the org detected from the site's outbound links.
-4. The dossier goes to the chosen model under a fixed JSON schema.
-5. The report renders as section cards, exportable as Markdown.
+```
+POST /api/run  ──►  202 { id }      client opens EventSource on /api/status/[id]
+                     │
+          ┌──────────┴──────────────────────────────────────────┐
+          │  Solari session (stealth + recording)               │
+          │    homepage ──► /pricing + /about   (parallel)      │
+          │    3 web searches + ProductHunt     (parallel)      │
+          └──────────┬──────────────────────────────────────────┘
+                     │  Hacker News + GitHub over plain HTTPS (no browser)
+                     ▼
+             dossier (~2-4k tokens)  ──►  your model  ──►  teardown JSON
+```
 
-A run is capped at **90 seconds** by a hard watchdog that races the whole agent —
-Playwright ignores `AbortSignal`, so a cooperative cancel alone cannot guarantee
-the run ever ends. The browser session is always released. One run at a time,
-enforced both client-side and server-side.
-
-### Token cost
-
-The dossier is kept small on purpose: 2,600 chars per page, 5 search results per
-query, 6 Hacker News hits. A typical run sends **~2-4k tokens** and caps output at
-6,000. The live feed prints the estimate before the call.
-
-If you are on a low OpenAI tier, note that `max_tokens` counts against your
-tokens-per-minute budget as a reservation — which is why the output ceiling is
-6k and not 16k.
+Collection takes **~18-30 seconds**. The whole run is capped at 90 seconds by a
+hard watchdog that races the agent — Playwright ignores `AbortSignal`, so a
+cooperative cancel alone cannot guarantee a run ever ends. One run at a time,
+enforced on both the client and the server.
 
 ---
 
-## Session replay
+## Honest sourcing
 
-Every browser session is recorded (`recording: true`), and the report page has a
-**watch agent replay** button next to the Markdown export. Failed runs get one
-too — that is when watching what the agent saw matters most.
+Competitive research is only useful if you can trust it, so the agent fails loudly
+rather than quietly.
 
-The button points at `GET /api/replay/[id]` rather than at a stored URL, because
-Solari's presigned link lives for only **900 seconds**. The route mints a fresh
-one on each click and redirects, so the link keeps working for as long as the
-recording is retained.
+- **Every source failure is shown** in the live feed and passed to the model, so a
+  blocked page becomes a stated gap rather than an invented fact.
+- **Search results must mention the target.** From a datacenter IP, Bing answers
+  blocked queries with HTTP 200 and an *identical canned SERP for every query*. A
+  result set where nothing names the company is treated as a failure — a silently
+  wrong source is worse than a missing one.
+- **Tech-stack signals are detected deterministically** from script, link, and meta
+  tags rather than guessed by the model.
+- **A missing homepage is not fatal.** Search, Hacker News, and GitHub still run,
+  and the report says what was lost.
 
-The recording is not a video. Solari captures an **rrweb event log** — DOM
-snapshots plus mutations — so `/replay/[id]` rebuilds the pages in an iframe and
-plays them back on a scrubbable timeline. Text stays selectable, and the long
-inactive gaps between pages are skipped automatically.
+### On stealth
 
-`GET /api/replay/[id]/events` proxies the log: it mints a presigned URL, gunzips
-the body, and returns the events as JSON. It is proxied rather than fetched
-directly because the S3 bucket serves no CORS headers for our origin.
+Sessions launch with `stealth: true`. Measured from a Solari egress IP:
 
-`GET /api/replay/[id]` still exists and redirects to the raw `.ndjson.gz` for
-anyone who wants the log itself.
+| Engine | Without stealth |
+|---|---|
+| Google | "unusual traffic" interstitial |
+| DuckDuckGo | captcha |
+| Brave | 429 |
+| Mojeek | 403 |
+| Startpage | hard block |
+| Bing | HTTP 200 — with a canned SERP that ignores the query |
+
+With stealth on, DuckDuckGo answers correctly. The launch falls back to a
+non-stealth session if the plan disallows it; the run still completes, with the
+search phase degraded and marked as such in the feed.
 
 ---
 
@@ -146,41 +149,67 @@ The app ships no model credentials. When you start a run, your key:
 - travels in the `POST /api/run` body,
 - is held only in the in-flight closure for that one call,
 - is **never** written to the run record, the event log, or any response body,
-- lives client-side in that browser tab's `sessionStorage`, and nowhere else.
+- lives in that browser tab's `sessionStorage`, and nowhere else.
 
-"Verify key" calls `POST /api/models`, which lists the models that key can actually
-use. That both validates the key and populates the model picker with real, current
+**Verify key** calls `POST /api/models`, which lists the models that key can
+actually use — validating the key and populating the picker with real, current
 model IDs instead of hard-coded ones that go stale.
 
-> Run it over HTTPS if you deploy it. On `http://localhost` the key is fine; over a
-> plain-HTTP deployment it would cross the wire in clear text.
+> Deploy behind HTTPS. On `localhost` the key is fine; over plain HTTP it would
+> cross the network in clear text.
+
+### Token cost
+
+The dossier is kept small on purpose — 2,600 chars per page, 5 search results per
+query, 6 Hacker News hits. A typical run sends **~2-4k tokens** and caps output at
+6,000. The live feed prints the estimate before each call.
+
+If you are on a low OpenAI tier, note that `max_tokens` counts against your
+tokens-per-minute budget as a *reservation* — which is why the output ceiling is
+6k and not 16k.
 
 ---
 
-## Honest sourcing
+## Session replay
 
-Competitive research is only useful if you can trust it, so the agent is built to
-fail loudly rather than quietly:
+Every browser session is recorded, and the report has a **watch agent replay**
+button. Failed runs get one too — that is when watching what the agent saw matters
+most.
 
-- **Every source failure is shown** in the live feed and passed to the model, so a
-  blocked page becomes a stated gap rather than an invented fact.
-- **Search results must mention the target.** Bing, from a datacenter IP, answers
-  blocked queries with HTTP 200 and an identical canned SERP for *every* query. A
-  result set where nothing names the company is treated as a failure — a silently
-  wrong source is worse than a missing one.
-- **Tech-stack signals are detected deterministically** from script, link, and meta
-  tags, not guessed by the model.
-- **Every report carries a confidence level** and a "not established by this run"
-  list.
+The recording is not a video: Solari captures an **rrweb event log** (DOM
+snapshots plus mutations), so `/replay/[id]` rebuilds the pages in an iframe and
+plays them back on a scrubbable timeline. Text stays selectable and the inactive
+gaps between pages are skipped.
 
-### On stealth
+`GET /api/replay/[id]/events` proxies the log — minting a fresh presigned URL,
+gunzipping, and returning JSON. Proxied because the presigned link expires after
+**900 seconds** and the bucket serves no CORS headers for our origin.
 
-Solari sessions launch with `stealth: true`. Measured from a plain datacenter
-egress: Google serves an "unusual traffic" interstitial, DuckDuckGo and Brave serve
-captchas, Mojeek 403s, Startpage hard-blocks, and Bing serves that canned SERP. With
-stealth on, DuckDuckGo answers normally. The launch falls back to a non-stealth
-session if the plan does not allow it — the run still completes, with the search
-phase degraded and marked as such in the feed.
+---
+
+## Demo mode
+
+Clicking an example **replays a saved run** rather than browsing live: no API key,
+no quota, ~14 seconds, identical every time.
+
+Fixtures are never hand-written. One is created only when a genuine run completes
+successfully — the real events, the real teardown, and the session recording are
+written to disk:
+
+```
+demo-fixtures/vercel.com.json               events + teardown
+demo-fixtures/vercel.com.replay.ndjson.gz   the rrweb recording
+```
+
+So a replay is a *cache of real output*, not a mock-up, and the report marks it
+with a **cached run** badge. A host with no fixture yet just runs live — and that
+run seeds the fixture for next time.
+
+```bash
+# Back-fill a run that finished before capture existed
+curl -X POST localhost:3000/api/demo/capture \
+  -H 'content-type: application/json' -d '{"runId":"<run-id>"}'
+```
 
 ---
 
@@ -188,45 +217,43 @@ phase degraded and marked as such in the feed.
 
 ```
 app/
-  page.tsx                  landing (full-viewport hero + competitor URL field)
-  settings/page.tsx         bring-your-own-key: provider, key, model
-  report/[id]/page.tsx      live agent + results (with error boundary)
-  api/run/route.ts          starts a run
-  api/status/[id]/route.ts  SSE stream
-  api/models/route.ts       model discovery + key validation
+  page.tsx                     landing — hero, competitor URL, one-click examples
+  settings/page.tsx            bring-your-own-key: provider, key, model
+  report/[id]/page.tsx         live agent feed, then the teardown
+  replay/[id]/page.tsx         rrweb playback of the recorded session
+  api/run/route.ts             starts a run (or replays a fixture)
+  api/status/[id]/route.ts     SSE stream
+  api/models/route.ts          model discovery + key validation
+  api/replay/[id]/...          presigned redirect + event proxy
+  api/demo/capture/route.ts    back-fill a demo fixture
 lib/
-  types.ts       shared types
-  solari.ts      browser session, page scraping, fingerprinting, search
-  sources.ts     Hacker News + GitHub over plain HTTPS
-  prompt.ts      system prompt, JSON schema, dossier rendering (provider-agnostic)
-  claude.ts      Anthropic adapter
-  openai.ts      OpenAI adapter
-  gemini.ts      Gemini adapter
-  llm.ts         provider dispatch (server-only)
-  providers.ts   provider metadata, no SDK imports (client-safe)
-  agent.ts       orchestration
-  store.ts       in-memory run store + SSE pub/sub
-  markdown.ts    Markdown export
+  solari.ts     browser session, scraping, fingerprinting, search ladder
+  sources.ts    Hacker News + GitHub over plain HTTPS
+  agent.ts      orchestration and phase deadlines
+  prompt.ts     system prompt, JSON schema, dossier rendering
+  claude.ts / openai.ts / gemini.ts     provider adapters
+  llm.ts        dispatch (server-only)  ·  providers.ts  metadata (client-safe)
+  store.ts      in-memory run store + SSE pub/sub
+  demo.ts       fixture capture and replay
+  markdown.ts · timezone.ts · storage-keys.ts · types.ts
 components/
-  VantageLanding.tsx   full-viewport landing composition
-  VantageBackdrop.tsx  shared background video + vignette
-  AppChrome.tsx        header/footer for the working surfaces
-  SettingsForm.tsx  ProviderPicker.tsx
-  StatusFeed.tsx  TeardownReport.tsx  RunView.tsx
+  VantageLanding · VantageBackdrop · AppChrome
+  ProviderPicker · SettingsForm
+  StatusFeed · TeardownReport · RunView · ReplayPlayer
 ```
 
-The landing owns its layout in `app/vantage.css`; the shared visual language —
-fonts, backdrop video, and the glass panels — lives in `app/globals.css` so the
-report and settings surfaces match it.
+---
 
 ## Notes and limits
 
-- **Stateless by design.** Reports live in a process-local `Map` for one hour and do
-  not survive a server restart. No auth, no database.
+- **Stateless by design.** Reports live in a process-local `Map` for one hour and
+  do not survive a restart. No auth, no database.
+- **Single process.** The in-memory store and the one-run-at-a-time guard assume
+  one server instance.
 - `@solarisdk/browser` and `patchright-core` are declared as
   `serverExternalPackages` — they drive a real Chromium and cannot be bundled.
-- Single-process only: the in-memory store and the one-run-at-a-time guard assume
-  one server instance.
+- ProductHunt frequently yields nothing; it degrades to a warning rather than
+  failing the run. Hacker News covers most of the same ground.
 
 ## Scripts
 
@@ -236,3 +263,7 @@ npm run build   # production build
 npm run start   # serve the build
 npm run lint    # eslint
 ```
+
+<div align="center">
+<sub>Built with <a href="https://getsolari.com">Solari</a> · Public sources only</sub>
+</div>
