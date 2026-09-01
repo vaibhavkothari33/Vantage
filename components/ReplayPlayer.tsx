@@ -20,9 +20,14 @@ type LoadState =
 export default function ReplayPlayer({
   runId,
   targetUrl,
+  eventsUrl,
+  backHref,
 }: {
   runId: string;
   targetUrl: string;
+  /** Overrides the API route — demos read a static file, with no server state. */
+  eventsUrl?: string;
+  backHref?: string;
 }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<LoadState>({ phase: "loading" });
@@ -37,13 +42,15 @@ export default function ReplayPlayer({
       if (!mount) return;
 
       try {
-        const response = await fetch(`/api/replay/${runId}/events`, {
-          cache: "no-store",
+        const source = eventsUrl ?? `/api/replay/${runId}/events`;
+        const response = await fetch(source, {
+          cache: eventsUrl ? "force-cache" : "no-store",
         });
-        const data = (await response.json()) as {
-          events?: eventWithTime[];
-          error?: string;
-        };
+        // The API wraps events in an object; a static file is the bare array.
+        const payload = (await response.json()) as
+          | eventWithTime[]
+          | { events?: eventWithTime[]; error?: string };
+        const data = Array.isArray(payload) ? { events: payload } : payload;
 
         if (!response.ok || !data.events) {
           if (!cancelled) {
@@ -113,7 +120,7 @@ export default function ReplayPlayer({
         // Player already torn down.
       }
     };
-  }, [runId]);
+  }, [runId, eventsUrl]);
 
   return (
     <div className="mx-auto w-full max-w-5xl px-6 py-10">
@@ -131,7 +138,7 @@ export default function ReplayPlayer({
           )}
         </div>
         <Link
-          href={`/report/${runId}`}
+          href={backHref ?? `/report/${runId}`}
           className="glass-soft rounded-lg px-3 py-2 font-mono text-xs text-foreground transition-colors hover:border-accent"
         >
           ← back to report

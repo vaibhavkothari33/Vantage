@@ -117,7 +117,11 @@ export default function TeardownReport({
               </button>
               {replay && (
                 <a
-                  href={`/replay/${runId}`}
+                  href={
+                    runId.startsWith("demo/")
+                      ? `/${runId}/replay`
+                      : `/replay/${runId}`
+                  }
                   target="_blank"
                   rel="noreferrer noopener"
                   title="Replays the recorded browser session"
