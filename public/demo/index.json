@@ -1,0 +1,12 @@
+[
+  {
+    "host": "supabase.com",
+    "events": 22,
+    "replayEvents": 187
+  },
+  {
+    "host": "vercel.com",
+    "events": 22,
+    "replayEvents": 67
+  }
+]
