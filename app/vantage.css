@@ -381,6 +381,9 @@
 }
 
 .hero-example {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
   padding: 5px 11px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
@@ -817,6 +820,9 @@
 }
 
 .hero-example {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
   padding: 5px 11px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;

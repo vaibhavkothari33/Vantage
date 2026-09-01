@@ -440,16 +440,14 @@ export default function VantageLanding() {
             <div className="hero-examples">
               <span className="hero-examples-label">Try these examples: </span>
               {EXAMPLES.map((example) => (
-                <button
+                <Link
                   key={example.host}
-                  type="button"
+                  href={`/demo/${example.host}`}
                   className="hero-example"
-                  disabled={submitting || activeRun !== null}
-                  title={`Run a teardown of ${example.host} — ${example.note}`}
-                  onClick={() => void start(example.host, true)}
+                  title={`Replay a saved teardown of ${example.host} — ${example.note}`}
                 >
                   {example.host}
-                </button>
+                </Link>
               ))}
             </div>
 
